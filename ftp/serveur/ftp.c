@@ -1,0 +1,173 @@
+/*
+** client.c 
+*/
+#include <netinet/in.h> // où la structure sockaddr_in et la fonction inet_ntoa sont définies
+#include<netdb.h>
+#include <sys/stat.h>
+       #include <fcntl.h>
+#include <sys/types.h> //la socket ...
+#include <sys/socket.h> //où la fonction socket est définie
+#include <arpa/inet.h> //où la fonction  htons et la fonction inet_ntoa sont définies
+#include <string.h> //où la fonction memset est définie
+#include <stdio.h> //pour les entrées sorties
+#include <stdlib.h>       
+
+
+#define PORT 3490 // .definition du numero du  port........
+#define MAXDATASIZE 200 // taille du bufer d'entree.........
+char buf[MAXDATASIZE]; 
+char *authentification(int sockfd)
+{
+    char log[45],pass[45];
+    int p=0;
+    printf("Login:");
+    scanf("%s",log);
+    printf("Password:");
+    scanf("%s",pass);
+    printf("connection.....\n");
+    if (send(sockfd,log, 200, 0) == -1) printf("Erreur lors de l'authentification..!!\n");
+    if (send(sockfd,pass, 200, 0) == -1) printf("Erreur lors de l'authentification..!!\n");
+    recv(sockfd, buf, MAXDATASIZE-1, 0);
+    return(buf);
+}
+
+void get(int sockfd)
+{
+   char op1[45];
+   int numbytes,cree;
+   if (send(sockfd,"get", 200, 0) == -1) printf("erreur de détermination de l'opération\n");
+   scanf("%s",op1);
+   if (send(sockfd, op1, 200, 0) == -1) printf("erreur d'envoi de message\n");
+   cree=open(op1, O_CREAT |O_RDWR,0666);
+   while ((numbytes=recv(sockfd, buf, MAXDATASIZE-1, 0))) { // .reception  msg........
+   write(cree,buf,numbytes);
+   if(numbytes < MAXDATASIZE-1) break;
+   }
+   close(cree);
+}
+
+void put(int sockfd)
+{
+   int fichier,x;
+   char buf_file[300],op1[45];
+   if (send(sockfd,"put", 200, 0) == -1) printf("erreur de détermination de l'opération\n");
+   scanf("%s",op1);
+   if (send(sockfd,op1, 200, 0) == -1) printf("erreur d'envoi de message\n");
+        
+   fichier=open(op1,O_RDONLY);
+   if (fichier<0)
+   { 
+     printf("Erreur lors de l'ouerture du fichie '%s' ...!!\n",op1);
+     return;
+   }
+ 
+   while(x=read(fichier,buf_file,200))
+    send(sockfd, buf_file, x, 0);
+   close(fichier);
+}
+
+void mget(int sockfd)
+{
+   char op1[45];
+   int numbytes,cree,i = 0,o=0;
+   char c;
+	while(o == 0){
+	i = 0;
+   strcpy(op1, "");
+   	while((c = getchar()) != ' '){
+   			if(c == '\n') {o=1; break;}
+   			else {op1[i] = c; i++;}
+   			}
+   op1[i] = '\0';
+   if(strcmp(op1, "") != 0){
+   if (send(sockfd,"get", 200, 0) == -1) printf("erreur de détermination de l'opération\n");
+   if (send(sockfd, op1, 200, 0) == -1) printf("erreur d'envoi de message\n");
+   cree=open(op1, O_CREAT |O_RDWR,0666);
+   while ((numbytes=recv(sockfd, buf, MAXDATASIZE-1, 0))) { // .reception  msg........
+   write(cree,buf,numbytes);
+   if(numbytes < MAXDATASIZE-1) break;
+   }
+   close(cree);
+   }
+   }
+   return ;
+}
+
+void mput(int sockfd)
+{
+   int fichier,x, o=0, i=0;
+   char buf_file[300],op1[45], c;
+   while(o == 0){
+	i = 0;
+   strcpy(op1, "");
+   	while((c = getchar()) != ' '){
+   			if(c == '\n') {o=1; break;}
+   			else {op1[i] = c; i++;}
+   			}
+   op1[i] = '\0';
+   if(strcmp(op1, "") != 0){
+   if (send(sockfd,"put", 200, 0) == -1) printf("erreur de détermination de l'opération\n");
+   if (send(sockfd,op1, 200, 0) == -1) printf("erreur d'envoi de message\n");
+        
+   fichier=open(op1,O_RDONLY);
+   if (fichier<0)
+   { 
+     printf("Erreur lors de l'ouerture du fichie '%s' ...!!\n",op1);
+     return;
+   }
+ 
+   while(x=read(fichier,buf_file,200))
+    send(sockfd, buf_file, x, 0);
+   close(fichier);
+   }
+   }
+   return;
+}
+int main(int argc, char *argv[])
+{
+    int sockfd, numbytes;   // .........
+    struct hostent *he; //........... 
+    struct sockaddr_in their_addr; //.........
+
+    /*if (argc != 3) {
+        fprintf(stderr,"usage: client hostname\n");
+        exit(1);
+    }*/
+    if ((he=gethostbyname(argv[1])) == NULL) {  // .........
+        perror("gethostbyname");
+        exit(1);
+    }
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) { // .........
+        perror("socket");
+        exit(1);
+    }
+    their_addr.sin_family = AF_INET;    // ......... 
+    their_addr.sin_port = htons(PORT);  // ......... 
+    their_addr.sin_addr = *((struct in_addr *) he->h_addr);
+    memset(&(their_addr.sin_zero), '\0', 8);  // ......... 
+    if (connect(sockfd, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) { // .........
+        perror("connect");
+        exit(1);
+    }
+
+    /* Authentification */
+    if(strcmp(authentification(sockfd),"ok")!=0)
+    {
+       printf("Login ou Password erroné..\n");
+       goto fin; 
+    }
+    
+    char op[45];
+deb:
+    printf("\n%s >",argv[0]);
+    scanf("%s",op);
+    if(strcmp(op,"bye")==0)
+    {
+      send(sockfd,"bye", 200, 0);
+      goto fin;
+    }
+    if(strcmp(op,"get")==0)
+      get(sockfd);
+    else
+    if(strcmp(op,"put")==0)
+    
