@@ -1,4 +1,4 @@
-mftp
+**mftp**
 ====
 
-a simple ftp app.
+*A simple ftp app with c language*
